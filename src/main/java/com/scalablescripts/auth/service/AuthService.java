@@ -3,6 +3,7 @@ package com.scalablescripts.auth.service;
 import com.scalablescripts.auth.data.User;
 import com.scalablescripts.auth.data.UserRepo;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -11,9 +12,11 @@ import java.util.Objects;
 @Service
 public class AuthService {
     private final UserRepo userRepo;
+    private final PasswordEncoder passwordEncoder;
 
-    public AuthService(UserRepo userRepo) {
+    public AuthService(UserRepo userRepo, PasswordEncoder passwordEncoder) {
         this.userRepo = userRepo;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public User register(String firstName, String lastName, String email, String password, String passwordConfirm) {
@@ -21,7 +24,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "password do not match");
 
         return userRepo.save(
-                User.of(firstName, lastName, email, password)
+                User.of(firstName, lastName, email, passwordEncoder.encode(password))
         );
     }
 }
