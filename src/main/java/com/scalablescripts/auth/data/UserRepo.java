@@ -1,4 +1,4 @@
-package com.scalablescripts.auth;
+package com.scalablescripts.auth.data;
 
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;

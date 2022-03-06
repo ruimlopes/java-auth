@@ -1,4 +1,4 @@
-package com.scalablescripts.auth;
+package com.scalablescripts.auth.data;
 
 import lombok.Getter;
 import lombok.Setter;
