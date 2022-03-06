@@ -1,7 +1,11 @@
 package com.scalablescripts.auth;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Objects;
 
 @RestController
 @RequestMapping(value = "/api")
@@ -12,16 +16,14 @@ public class AuthController {
         this.userRepo = userRepo;
     }
 
-    @GetMapping(value = "/hello")
-    public String hello() {
-        return "Hello!";
-    }
-
     record RegisterRequest(@JsonProperty("first_name") String firstName, @JsonProperty("last_name") String lastName, String email, String password, @JsonProperty("password_confirm") String passwordConfirm) {}
     record RegisterResponse(Long id, @JsonProperty("first_name") String firstName, @JsonProperty("last_name") String lastName, String email) {}
 
     @PostMapping(value = "/register")
     public RegisterResponse register(@RequestBody RegisterRequest registerRequest) {
+        if (!Objects.equals(registerRequest.password(), registerRequest.passwordConfirm()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "password do not match");
+
         var user = userRepo.save(
                 User.of(
                         registerRequest.firstName(),
