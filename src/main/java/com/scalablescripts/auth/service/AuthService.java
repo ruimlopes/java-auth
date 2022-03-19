@@ -5,6 +5,7 @@ import com.scalablescripts.auth.data.UserRepo;
 import com.scalablescripts.auth.error.EmailAlreadyExistsError;
 import com.scalablescripts.auth.error.InvalidCredentialsError;
 import com.scalablescripts.auth.error.PasswordsDoNotMatchError;
+import com.scalablescripts.auth.error.UserNotFoundError;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.relational.core.conversion.DbActionExecutionException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -51,5 +52,10 @@ public class AuthService {
             throw new InvalidCredentialsError();
 
         return Login.of(user.getId(), accessTokenSecret, refreshTokenSecret);
+    }
+
+    public User getUserFromToken(String token) {
+        return userRepo.findById(Token.from(token, accessTokenSecret))
+                .orElseThrow(UserNotFoundError::new);
     }
 }

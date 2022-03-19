@@ -1,5 +1,6 @@
 package com.scalablescripts.auth.service;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import lombok.Getter;
@@ -28,5 +29,14 @@ public class Token {
                         .signWith(SignatureAlgorithm.HS256, Base64.getEncoder().encodeToString(secretKey.getBytes(StandardCharsets.UTF_8)))
                         .compact()
         );
+    }
+
+    public static Long from(String token, String secretKey) {
+        return ((Claims) Jwts.parserBuilder()
+                .setSigningKey(Base64.getEncoder().encodeToString(secretKey.getBytes(StandardCharsets.UTF_8)))
+                .build()
+                .parse(token)
+                .getBody())
+                .get("user_id", Long.class);
     }
 }
