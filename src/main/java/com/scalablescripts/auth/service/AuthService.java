@@ -36,13 +36,13 @@ public class AuthService {
         return user;
     }
 
-    public User login(String email, String password) {
+    public Token login(String email, String password) {
         var user = userRepo.findByEmail(email)
                 .orElseThrow(InvalidCredentialsError::new);
 
         if (!passwordEncoder.matches(password, user.getPassword()))
             throw new InvalidCredentialsError();
 
-        return user;
+        return Token.of(user.getId(), 10L, "very_long_and_secure_and_safe_access_key");
     }
 }
