@@ -7,6 +7,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletResponse;
+
 @RestController
 @RequestMapping(value = "/api")
 public class AuthController {
@@ -36,9 +39,16 @@ public class AuthController {
     record LoginResponse(String token) {}
 
     @PostMapping(value = "/login")
-    public LoginResponse login(@RequestBody LoginRequest loginRequest) {
-        var token = authService.login(loginRequest.email(), loginRequest.password());
+    public LoginResponse login(@RequestBody LoginRequest loginRequest, HttpServletResponse response) {
+        var login = authService.login(loginRequest.email(), loginRequest.password());
 
-        return new LoginResponse(token.getToken());
+        Cookie cookie = new Cookie("refresh_token", login.getRefreshToken().getToken());
+        cookie.setMaxAge(3600);
+        cookie.setHttpOnly(true);
+        cookie.setPath("/api");
+
+        response.addCookie(cookie);
+
+        return new LoginResponse(login.getAccessToken().getToken());
     }
 }

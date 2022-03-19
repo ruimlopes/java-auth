@@ -5,11 +5,10 @@ import com.scalablescripts.auth.data.UserRepo;
 import com.scalablescripts.auth.error.EmailAlreadyExistsError;
 import com.scalablescripts.auth.error.InvalidCredentialsError;
 import com.scalablescripts.auth.error.PasswordsDoNotMatchError;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.relational.core.conversion.DbActionExecutionException;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Objects;
 
@@ -17,10 +16,18 @@ import java.util.Objects;
 public class AuthService {
     private final UserRepo userRepo;
     private final PasswordEncoder passwordEncoder;
+    private final String accessTokenSecret;
+    private final String refreshTokenSecret;
 
-    public AuthService(UserRepo userRepo, PasswordEncoder passwordEncoder) {
+    public AuthService(
+            UserRepo userRepo,
+            PasswordEncoder passwordEncoder,
+            @Value("${application.security.access-token-secret}") String accessTokenSecret,
+            @Value("${application.security.refresh-token-secret}") String refreshTokenSecret) {
         this.userRepo = userRepo;
         this.passwordEncoder = passwordEncoder;
+        this.accessTokenSecret = accessTokenSecret;
+        this.refreshTokenSecret = refreshTokenSecret;
     }
 
     public User register(String firstName, String lastName, String email, String password, String passwordConfirm) {
@@ -36,13 +43,13 @@ public class AuthService {
         return user;
     }
 
-    public Token login(String email, String password) {
+    public Login login(String email, String password) {
         var user = userRepo.findByEmail(email)
                 .orElseThrow(InvalidCredentialsError::new);
 
         if (!passwordEncoder.matches(password, user.getPassword()))
             throw new InvalidCredentialsError();
 
-        return Token.of(user.getId(), 10L, "very_long_and_secure_and_safe_access_key");
+        return Login.of(user.getId(), accessTokenSecret, refreshTokenSecret);
     }
 }
