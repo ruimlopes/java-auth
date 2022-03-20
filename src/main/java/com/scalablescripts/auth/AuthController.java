@@ -35,7 +35,7 @@ public class AuthController {
     }
 
     record LoginRequest(String email, String password) {}
-    record LoginResponse(String token) {}
+    record LoginResponse(Long id, String secret, @JsonProperty("otpauth_url") String otpAuthUrl) {}
 
     @PostMapping(value = "/login")
     public LoginResponse login(@RequestBody LoginRequest loginRequest, HttpServletResponse response) {
@@ -48,7 +48,7 @@ public class AuthController {
 
         response.addCookie(cookie);
 
-        return new LoginResponse(login.getAccessToken().getToken());
+        return new LoginResponse(login.getAccessToken().getUserId(), login.getOtpSecret(), login.getOtpUrl());
     }
 
     record UserResponse(Long id, @JsonProperty("first_name") String firstName, @JsonProperty("last_name") String lastName, String email) {}
