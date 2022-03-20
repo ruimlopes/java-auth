@@ -102,4 +102,17 @@ public class AuthService {
 
         userRepo.save(user);
     }
+
+    public void reset(String token, String password, String passwordConfirm) {
+        if (!Objects.equals(password, passwordConfirm))
+            throw new PasswordsDoNotMatchError();
+
+        var user = userRepo.findByPasswordRecoveriesToken(token)
+                .orElseThrow(InvalidLinkError::new);
+
+        user.setPassword(passwordEncoder.encode(password));
+        user.removePasswordRecoveryIf(passwordRecovery -> Objects.equals(passwordRecovery.token(), token));
+
+        userRepo.save(user);
+    }
 }
