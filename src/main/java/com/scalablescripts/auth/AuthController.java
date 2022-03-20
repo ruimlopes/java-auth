@@ -113,4 +113,14 @@ public class AuthController {
 
         return new TwoFactorResponse(login.getAccessToken().getToken());
     }
+
+    record GoogleAuthRequest(String token, String secret,String code) {}
+    record GoogleAuthResponse(String token) {}
+
+    @PostMapping(value = "/google-auth")
+    public GoogleAuthResponse googleAuth(@RequestBody GoogleAuthRequest googleAuthRequest) {
+        var login = authService.googleAuthLogin(googleAuthRequest.token());
+
+        return new GoogleAuthResponse(login.getAccessToken().getToken());
+    }
 }

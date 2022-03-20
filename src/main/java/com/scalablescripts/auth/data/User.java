@@ -7,10 +7,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.PersistenceConstructor;
 import org.springframework.data.relational.core.mapping.MappedCollection;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Predicate;
 
 @ToString
@@ -31,7 +28,7 @@ public class User {
     @MappedCollection private final Set<PasswordRecovery> passwordRecoveries = new HashSet<>();
 
     public static User of(String firstName, String lastName, String email, String password) {
-        return new User(null, firstName, lastName, email, password, null, Collections.emptyList(), Collections.emptyList());
+        return new User(null, firstName, lastName, email, password, "", Collections.emptyList(), Collections.emptyList());
     }
 
     @PersistenceConstructor
@@ -68,5 +65,9 @@ public class User {
 
     public Boolean removePasswordRecoveryIf(Predicate<? super PasswordRecovery> predicate) {
         return this.passwordRecoveries.removeIf(predicate);
+    }
+
+    public Boolean isTfaValid() {
+        return Objects.equals(tfaSecret, "");
     }
 }

@@ -1,5 +1,9 @@
 package com.scalablescripts.auth.service;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.scalablescripts.auth.data.PasswordRecovery;
 import com.scalablescripts.auth.data.Token;
 import com.scalablescripts.auth.data.User;
@@ -11,6 +15,9 @@ import org.springframework.data.relational.core.conversion.DbActionExecutionExce
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.security.GeneralSecurityException;
+import java.util.Collections;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -22,19 +29,22 @@ public class AuthService {
     private final String refreshTokenSecret;
     private final MailService mailService;
     private final CodeVerifier codeVerifier;
+    private final String appClientId;
 
     public AuthService(
             UserRepo userRepo,
             PasswordEncoder passwordEncoder,
             @Value("${application.security.access-token-secret}") String accessTokenSecret,
             @Value("${application.security.refresh-token-secret}") String refreshTokenSecret,
-            MailService mailService, CodeVerifier codeVerifier) {
+            MailService mailService, CodeVerifier codeVerifier,
+            @Value("${application.security.google-client-id}") String appClientId) {
         this.userRepo = userRepo;
         this.passwordEncoder = passwordEncoder;
         this.accessTokenSecret = accessTokenSecret;
         this.refreshTokenSecret = refreshTokenSecret;
         this.mailService = mailService;
         this.codeVerifier = codeVerifier;
+        this.appClientId = appClientId;
     }
 
     public User register(String firstName, String lastName, String email, String password, String passwordConfirm) {
@@ -57,13 +67,7 @@ public class AuthService {
         if (!passwordEncoder.matches(password, user.getPassword()))
             throw new InvalidCredentialsError();
 
-        var login = Login.of(user.getId(), accessTokenSecret, refreshTokenSecret, Objects.equals(user.getTfaSecret(), ""));
-        var refreshJwt = login.getRefreshToken();
-
-        user.addToken(new Token(refreshJwt.getToken(), refreshJwt.getIssuedAt(), refreshJwt.getExpiration()));
-        userRepo.save(user);
-
-        return login;
+        return getLogin(user);
     }
 
     public User getUserFromToken(String token) {
@@ -134,6 +138,46 @@ public class AuthService {
         }
 
         var login = Login.of(user.getId(), accessTokenSecret, refreshTokenSecret, false);
+        var refreshJwt = login.getRefreshToken();
+
+        user.addToken(new Token(refreshJwt.getToken(), refreshJwt.getIssuedAt(), refreshJwt.getExpiration()));
+        userRepo.save(user);
+
+        return login;
+    }
+
+    public Login googleAuthLogin(String token) {
+        GoogleIdTokenVerifier verifier;
+        GoogleIdToken idToken = null;
+
+        try {
+            verifier = new GoogleIdTokenVerifier.Builder(GoogleNetHttpTransport.newTrustedTransport(), new GsonFactory())
+                    .setAudience(Collections.singletonList(appClientId))
+                    .build();
+
+            idToken = verifier.verify(token);
+        } catch (GeneralSecurityException | IOException e) {
+            throw new InvalidCredentialsError();
+        }
+
+        if (idToken == null)
+            throw new UserNotFoundError();
+
+        GoogleIdToken.Payload payload = idToken.getPayload();
+
+        var email = payload.getEmail();
+        var firstName = (String) payload.get("given_name");
+        var lastName = (String) payload.get("family_name");
+
+        var user = userRepo.findByEmail(email)
+                .orElse(User.of(firstName, lastName, email, UUID.randomUUID().toString()));
+        userRepo.save(user);
+
+        return getLogin(user);
+    }
+
+    private Login getLogin(User user) {
+        var login = Login.of(user.getId(), accessTokenSecret, refreshTokenSecret, Objects.equals(user.getTfaSecret(), ""));
         var refreshJwt = login.getRefreshToken();
 
         user.addToken(new Token(refreshJwt.getToken(), refreshJwt.getIssuedAt(), refreshJwt.getExpiration()));
