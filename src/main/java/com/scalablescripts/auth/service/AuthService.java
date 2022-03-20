@@ -1,11 +1,9 @@
 package com.scalablescripts.auth.service;
 
+import com.scalablescripts.auth.data.Token;
 import com.scalablescripts.auth.data.User;
 import com.scalablescripts.auth.data.UserRepo;
-import com.scalablescripts.auth.error.EmailAlreadyExistsError;
-import com.scalablescripts.auth.error.InvalidCredentialsError;
-import com.scalablescripts.auth.error.PasswordsDoNotMatchError;
-import com.scalablescripts.auth.error.UserNotFoundError;
+import com.scalablescripts.auth.error.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.relational.core.conversion.DbActionExecutionException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -51,7 +49,13 @@ public class AuthService {
         if (!passwordEncoder.matches(password, user.getPassword()))
             throw new InvalidCredentialsError();
 
-        return Login.of(user.getId(), accessTokenSecret, refreshTokenSecret);
+        var login = Login.of(user.getId(), accessTokenSecret, refreshTokenSecret);
+        var refreshJwt = login.getRefreshToken();
+
+        user.addToken(new Token(refreshJwt.getToken(), refreshJwt.getIssuedAt(), refreshJwt.getExpiration()));
+        userRepo.save(user);
+
+        return login;
     }
 
     public User getUserFromToken(String token) {
@@ -62,6 +66,23 @@ public class AuthService {
     public Login refreshAccess(String refreshToken) {
         var refreshJwt = Jwt.from(refreshToken, refreshTokenSecret);
 
+        var user = userRepo.findByIdAndTokensRefreshTokenAndTokensExpiredAtGreaterThan(refreshJwt.getUserId(), refreshJwt.getToken(), refreshJwt.getExpiration())
+                .orElseThrow(UnauthenticatedError::new);
+
         return Login.of(refreshJwt.getUserId(), accessTokenSecret, refreshJwt);
+    }
+
+    public Boolean logout(String refreshToken) {
+        var refreshJwt = Jwt.from(refreshToken, refreshTokenSecret);
+
+        var user = userRepo.findById(refreshJwt.getUserId())
+                .orElseThrow(UnauthenticatedError::new);
+
+        var tokenIsRemoved = user.removeTokenIf(token -> Objects.equals(token.refreshToken(), refreshToken));
+
+        if (tokenIsRemoved)
+            userRepo.save(user);
+
+        return tokenIsRemoved;
     }
 }

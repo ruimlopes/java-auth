@@ -49,7 +49,7 @@ public class User {
         return this.tokens.remove(token);
     }
 
-    public Boolean removeTokenId(Predicate<? super Token> predicate) {
+    public Boolean removeTokenIf(Predicate<? super Token> predicate) {
         return this.tokens.removeIf(predicate);
     }
 }
