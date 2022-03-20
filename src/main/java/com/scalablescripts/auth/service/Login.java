@@ -1,10 +1,7 @@
 package com.scalablescripts.auth.service;
 
-import com.google.common.io.BaseEncoding;
+import dev.samstevens.totp.secret.DefaultSecretGenerator;
 import lombok.Getter;
-
-import java.nio.charset.StandardCharsets;
-import java.util.UUID;
 
 public class Login {
     @Getter
@@ -26,28 +23,42 @@ public class Login {
         this.otpUrl = otpUrl;
     }
 
-    public static Login of(Long userId, String accessSecret, String refreshSecret) {
-        var otpSecret = generateOtpSecret();
+    public static Login of(Long userId, String accessSecret, String refreshSecret, Boolean generateOtp) {
+        String otpSecret = null;
+        String otpUrl = null;
+
+        if (generateOtp) {
+            otpSecret = generateOtpSecret();
+            otpUrl = getOtpUrl(otpSecret);
+        }
+
         return new Login(
                 Jwt.of(userId, ACCESS_TOKEN_VALIDITY, accessSecret),
                 Jwt.of(userId, REFRESH_TOKEN_VALIDITY, refreshSecret),
-                otpSecret, getOtpUrl(otpSecret)
+                otpSecret,
+                otpUrl
         );
     }
 
-    public static Login of(Long userId, String accessSecret, Jwt refreshToken) {
-        var otpSecret = generateOtpSecret();
+    public static Login of(Long userId, String accessSecret, Jwt refreshToken, Boolean generateOtp) {
+        String otpSecret = null;
+        String otpUrl = null;
+
+        if (generateOtp) {
+            otpSecret = generateOtpSecret();
+            otpUrl = getOtpUrl(otpSecret);
+        }
+
         return new Login(
                 Jwt.of(userId,ACCESS_TOKEN_VALIDITY, accessSecret),
                 refreshToken,
                 otpSecret,
-                getOtpUrl(otpSecret)
+                otpUrl
         );
     }
 
     private static String generateOtpSecret() {
-        var uuid = UUID.randomUUID().toString();
-        return BaseEncoding.base32().encode(uuid.getBytes(StandardCharsets.UTF_8));
+        return new DefaultSecretGenerator().generate();
     }
 
     private static String getOtpUrl(String otpSecret) {

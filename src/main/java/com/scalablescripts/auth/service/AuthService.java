@@ -5,6 +5,7 @@ import com.scalablescripts.auth.data.Token;
 import com.scalablescripts.auth.data.User;
 import com.scalablescripts.auth.data.UserRepo;
 import com.scalablescripts.auth.error.*;
+import dev.samstevens.totp.code.CodeVerifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.relational.core.conversion.DbActionExecutionException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,18 +21,20 @@ public class AuthService {
     private final String accessTokenSecret;
     private final String refreshTokenSecret;
     private final MailService mailService;
+    private final CodeVerifier codeVerifier;
 
     public AuthService(
             UserRepo userRepo,
             PasswordEncoder passwordEncoder,
             @Value("${application.security.access-token-secret}") String accessTokenSecret,
             @Value("${application.security.refresh-token-secret}") String refreshTokenSecret,
-            MailService mailService) {
+            MailService mailService, CodeVerifier codeVerifier) {
         this.userRepo = userRepo;
         this.passwordEncoder = passwordEncoder;
         this.accessTokenSecret = accessTokenSecret;
         this.refreshTokenSecret = refreshTokenSecret;
         this.mailService = mailService;
+        this.codeVerifier = codeVerifier;
     }
 
     public User register(String firstName, String lastName, String email, String password, String passwordConfirm) {
@@ -54,7 +57,7 @@ public class AuthService {
         if (!passwordEncoder.matches(password, user.getPassword()))
             throw new InvalidCredentialsError();
 
-        var login = Login.of(user.getId(), accessTokenSecret, refreshTokenSecret);
+        var login = Login.of(user.getId(), accessTokenSecret, refreshTokenSecret, Objects.equals(user.getTfaSecret(), ""));
         var refreshJwt = login.getRefreshToken();
 
         user.addToken(new Token(refreshJwt.getToken(), refreshJwt.getIssuedAt(), refreshJwt.getExpiration()));
@@ -74,7 +77,7 @@ public class AuthService {
         var user = userRepo.findByIdAndTokensRefreshTokenAndTokensExpiredAtGreaterThan(refreshJwt.getUserId(), refreshJwt.getToken(), refreshJwt.getExpiration())
                 .orElseThrow(UnauthenticatedError::new);
 
-        return Login.of(refreshJwt.getUserId(), accessTokenSecret, refreshJwt);
+        return Login.of(refreshJwt.getUserId(), accessTokenSecret, refreshJwt, false);
     }
 
     public Boolean logout(String refreshToken) {
@@ -114,5 +117,28 @@ public class AuthService {
         user.removePasswordRecoveryIf(passwordRecovery -> Objects.equals(passwordRecovery.token(), token));
 
         userRepo.save(user);
+    }
+
+    public Login twoFactorLogin(Long id, String secret, String code) {
+        var user = userRepo.findById(id)
+                .orElseThrow(InvalidCredentialsError::new);
+
+        var tfaSecret = !Objects.equals(user.getTfaSecret(), "") ? user.getTfaSecret() : secret;
+
+        if (!codeVerifier.isValidCode(tfaSecret,code))
+            throw new InvalidCredentialsError();
+
+        if (Objects.equals(user.getTfaSecret(), "")) {
+            user.setTfaSecret(secret);
+            userRepo.save(user);
+        }
+
+        var login = Login.of(user.getId(), accessTokenSecret, refreshTokenSecret, false);
+        var refreshJwt = login.getRefreshToken();
+
+        user.addToken(new Token(refreshJwt.getToken(), refreshJwt.getIssuedAt(), refreshJwt.getExpiration()));
+        userRepo.save(user);
+
+        return login;
     }
 }

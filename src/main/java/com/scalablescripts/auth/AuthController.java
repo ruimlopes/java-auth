@@ -103,4 +103,14 @@ public class AuthController {
 
         return new ResetResponse("success");
     }
+
+    record TwoFactorRequest(Long id, String secret, String code) {}
+    record TwoFactorResponse(String token) {}
+
+    @PostMapping(value = "/two-factor")
+    public TwoFactorResponse twoFactor(@RequestBody TwoFactorRequest twoFactorRequest) {
+        var login = authService.twoFactorLogin(twoFactorRequest.id(), twoFactorRequest.secret(), twoFactorRequest.code());
+
+        return new TwoFactorResponse(login.getAccessToken().getToken());
+    }
 }
