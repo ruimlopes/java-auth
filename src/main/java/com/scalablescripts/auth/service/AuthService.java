@@ -19,16 +19,19 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final String accessTokenSecret;
     private final String refreshTokenSecret;
+    private final MailService mailService;
 
     public AuthService(
             UserRepo userRepo,
             PasswordEncoder passwordEncoder,
             @Value("${application.security.access-token-secret}") String accessTokenSecret,
-            @Value("${application.security.refresh-token-secret}") String refreshTokenSecret) {
+            @Value("${application.security.refresh-token-secret}") String refreshTokenSecret,
+            MailService mailService) {
         this.userRepo = userRepo;
         this.passwordEncoder = passwordEncoder;
         this.accessTokenSecret = accessTokenSecret;
         this.refreshTokenSecret = refreshTokenSecret;
+        this.mailService = mailService;
     }
 
     public User register(String firstName, String lastName, String email, String password, String passwordConfirm) {
@@ -94,6 +97,8 @@ public class AuthService {
                 .orElseThrow(UserNotFoundError::new);
 
         user.addPasswordRecovery(new PasswordRecovery(token));
+
+        mailService.sendForgotMessage(email, token, originUrl);
 
         userRepo.save(user);
     }
